@@ -36,6 +36,8 @@ export interface Level {
   items: Item[];
   nodes: NodeDef[];
   edges: EdgeDef[];
+  /** Groups of slot ids whose symbols may be placed in any order. */
+  interchangeable?: string[][];
 }
 
 /** slot id -> placed item id */

@@ -141,7 +141,30 @@ function twoWay(
   return build(tier, meta, specs, edges, d);
 }
 
-export const levels: Level[] = [
+/** Slots whose order does not affect the result, keyed by level id. */
+const INTERCHANGEABLE: Record<number, string[][]> = {
+  1: [["inA", "inB"]],
+  2: [["inL", "inW"]],
+  4: [["in1", "in2"]],
+  10: [["in0", "in1"]],
+  14: [
+    ["tot", "cnt"],
+    ["add", "inc"],
+  ],
+  15: [["in0", "in1"]],
+  24: [["t", "i"]],
+  25: [
+    ["setm", "setc"],
+    ["upd", "inc"],
+  ],
+  27: [
+    ["sets", "setq"],
+    ["add", "inc"],
+  ],
+  28: [["n1", "n2", "op"]],
+};
+
+const baseLevels: Level[] = [
   // ───────────── Easy: sequence and a single decision ─────────────
   easy(
     {
@@ -889,6 +912,11 @@ export const levels: Level[] = [
     [["process", "choice = 0"]],
   ),
 ];
+
+export const levels: Level[] = baseLevels.map((level) => ({
+  ...level,
+  interchangeable: INTERCHANGEABLE[level.id],
+}));
 
 export const TIERS: { id: Tier; label: string; blurb: string }[] = [
   { id: "easy", label: "Easy", blurb: "Sequence and a single decision" },

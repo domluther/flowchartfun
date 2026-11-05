@@ -54,20 +54,51 @@ export interface CheckResult {
   solved: boolean;
 }
 
-/** Items with identical shape and text are interchangeable. */
+/**
+ * Items with identical shape and text are interchangeable, and so are the
+ * slots listed together in `level.interchangeable` (steps whose order does
+ * not change the result, such as two inputs in a row).
+ */
 export function check(level: Level, placements: Placements): CheckResult {
   const correct: string[] = [];
   const wrong: string[] = [];
   const empty: string[] = [];
+  const key = (itemId: string) => {
+    const item = itemById(level, itemId);
+    return `${item.shape}|${item.text}`;
+  };
+  const groupOf = new Map<string, string[]>();
+  for (const group of level.interchangeable ?? []) {
+    for (const id of group) groupOf.set(id, group);
+  }
+  const remaining = new Map<string[], string[]>();
+  for (const group of groupOf.values()) {
+    if (remaining.has(group)) continue;
+    const answers = group.map((id) => {
+      const node = level.nodes.find((n) => n.id === id);
+      return node ? key(node.answer) : "";
+    });
+    remaining.set(group, answers);
+  }
   for (const n of level.nodes) {
     const placed = placements[n.id];
     if (!placed) {
       empty.push(n.id);
       continue;
     }
-    const a = itemById(level, placed);
-    const b = itemById(level, n.answer);
-    (a.shape === b.shape && a.text === b.text ? correct : wrong).push(n.id);
+    const group = groupOf.get(n.id);
+    if (group) {
+      const pool = remaining.get(group) ?? [];
+      const i = pool.indexOf(key(placed));
+      if (i >= 0) {
+        pool.splice(i, 1);
+        correct.push(n.id);
+      } else {
+        wrong.push(n.id);
+      }
+    } else {
+      (key(placed) === key(n.answer) ? correct : wrong).push(n.id);
+    }
   }
   return {
     correct,

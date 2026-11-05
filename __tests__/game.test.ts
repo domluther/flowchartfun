@@ -76,3 +76,64 @@ describe("placement", () => {
     expect(place(l, p, "start", "in")).toBe(p);
   });
 });
+
+describe("interchangeable steps", () => {
+  const solved = (level: Level): Placements => {
+    const p: Placements = {};
+    for (const n of level.nodes) p[n.id] = n.answer;
+    return p;
+  };
+
+  it("accepts inputs A and B in either order on level 1", () => {
+    const level = getLevel(1) as Level;
+    const p = solved(level);
+    p.inA = "inB";
+    p.inB = "inA";
+    expect(check(level, p).solved).toBe(true);
+  });
+
+  it("still rejects an independent step swapped with a dependent one", () => {
+    const level = getLevel(1) as Level;
+    const p = solved(level);
+    p.inB = "calc";
+    p.calc = "inB";
+    const result = check(level, p);
+    expect(result.solved).toBe(false);
+    expect(result.wrong).toEqual(expect.arrayContaining(["inB", "calc"]));
+  });
+
+  it("rejects the same symbol used twice in a group", () => {
+    const level = getLevel(1) as Level;
+    const p = solved(level);
+    p.inB = "inA";
+    expect(check(level, p).solved).toBe(false);
+  });
+
+  it.each(levels.filter((l) => l.interchangeable))(
+    "level $id: every order of each group is accepted",
+    (level) => {
+      for (const group of level.interchangeable ?? []) {
+        const p = solved(level);
+        const answers = group.map((id) => p[id]);
+        group.forEach((id, i) => {
+          p[id] = answers[(i + 1) % group.length];
+        });
+        expect(check(level, p).solved).toBe(true);
+      }
+    },
+  );
+
+  it("never groups slots holding different kinds of symbol", () => {
+    for (const level of levels) {
+      for (const group of level.interchangeable ?? []) {
+        const shapes = group.map(
+          (id) =>
+            level.items.find(
+              (i) => i.id === level.nodes.find((n) => n.id === id)?.answer,
+            )?.shape,
+        );
+        expect(new Set(shapes).size).toBe(1);
+      }
+    }
+  });
+});

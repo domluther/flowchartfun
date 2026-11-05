@@ -110,7 +110,20 @@ for (const mode of modes) {
       }) => {
         await openLevel(page, level, mode);
         const movable = level.nodes.filter((n) => !n.fixed);
-        const [a, b] = movable;
+        const sameGroup = (x: string, y: string) =>
+          (level.interchangeable ?? []).some(
+            (g) => g.includes(x) && g.includes(y),
+          );
+        const text = (id: string) => level.items.find((i) => i.id === id)?.text;
+        const pairs = movable.flatMap((x, i) =>
+          movable.slice(i + 1).map((y) => [x, y] as const),
+        );
+        const pair = pairs.find(
+          ([x, y]) =>
+            !sameGroup(x.id, y.id) && text(x.answer) !== text(y.answer),
+        );
+        if (!pair) throw new Error("no swappable pair");
+        const [a, b] = pair;
         const swapped = {
           ...Object.fromEntries(movable.map((n) => [n.id, n.answer])),
         };
@@ -122,6 +135,30 @@ for (const mode of modes) {
         }
         await page.getByRole("button", { name: "Check Answer" }).click();
         await expect(status(page)).not.toContainText("Correct");
+      });
+    }
+
+    for (const level of levels.filter((l) => l.interchangeable)) {
+      test(`level ${level.id}: ${level.title} accepts any order for independent steps`, async ({
+        page,
+      }) => {
+        await openLevel(page, level, mode);
+        const answers: Record<string, string> = {};
+        for (const group of level.interchangeable ?? []) {
+          group.forEach((id, i) => {
+            const next = group[(i + 1) % group.length];
+            answers[id] = level.nodes.find((n) => n.id === next)?.answer ?? id;
+          });
+        }
+        for (const node of level.nodes.filter((n) => !n.fixed)) {
+          await page
+            .getByTestId(`item-${answers[node.id] ?? node.answer}`)
+            .click();
+          await page.getByTestId(`slot-${node.id}`).click();
+        }
+        if (mode === "draw") await drawArrows(page, level);
+        await page.getByRole("button", { name: "Check Answer" }).click();
+        await expect(status(page)).toContainText("Correct");
       });
     }
 
