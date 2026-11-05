@@ -7,9 +7,10 @@ import {
   setLabel,
   type UserEdge,
 } from "../app/lib/edges";
+import { check, initialPlacements, place } from "../app/lib/game";
 import { nearestSide } from "../app/lib/layout";
 import { getLevel, levels } from "../app/lib/levels";
-import type { Level } from "../app/lib/types";
+import type { Level, Placements } from "../app/lib/types";
 
 const level = getLevel(5) as Level; // start → in0 → dec ─Yes→ yes, ─No→ no → end
 
@@ -132,3 +133,49 @@ describe("nearestSide", () => {
     expect(nearestSide(node, { x: 235, y: 80 })).toBe("r");
   });
 });
+
+describe.each(levels)("level $id with symbols placed anywhere", (l) => {
+  it("has symbols that are unique by shape and text", () => {
+    const keys = l.nodes.map((n) => {
+      const item = l.items.find((i) => i.id === n.answer);
+      return `${item?.shape}|${item?.text}`;
+    });
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("is solved in draw mode when the symbols are shuffled between slots", () => {
+    const movable = l.nodes.filter((n) => !n.fixed);
+    const p: Placements = initialPlacements(l);
+    const slotOf = new Map<string, string>();
+    for (const n of l.nodes) if (n.fixed) slotOf.set(n.id, n.id);
+    movable.forEach((n, i) => {
+      const slot = movable[(i + 1) % movable.length].id;
+      p[slot] = n.answer;
+      slotOf.set(n.id, slot);
+    });
+    let edges: UserEdge[] = [];
+    for (const e of l.edges) {
+      const from = slotOf.get(e.from) as string;
+      const to = slotOf.get(e.to) as string;
+      edges = addEdge(edges, from, e.fromSide, to, e.toSide).edges;
+      if (e.label) edges = setLabel(edges, `${from}->${to}`, e.label as "Yes");
+    }
+    expect(check(l, p, true).solved).toBe(true);
+    expect(checkEdges(l, edges, p).solved).toBe(true);
+  });
+
+  it("still rejects a wrong Yes/No label when symbols are moved", () => {
+    const dec = l.edges.find((e) => e.label);
+    if (!dec) return;
+    const swapped = perfect(l).map((e) =>
+      e.label ? { ...e, label: e.label === "Yes" ? "No" : "Yes" } : e,
+    );
+    expect(checkEdges(l, swapped, initialPlacementsFull(l)).solved).toBe(false);
+  });
+});
+
+function initialPlacementsFull(l: Level) {
+  let p = initialPlacements(l);
+  for (const n of l.nodes) p = place(l, p, n.id, n.answer);
+  return p;
+}

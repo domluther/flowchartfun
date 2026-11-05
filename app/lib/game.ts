@@ -66,9 +66,15 @@ export interface CheckResult {
 /**
  * Items with identical shape and text are interchangeable, and so are the
  * slots listed together in `level.interchangeable` (steps whose order does
- * not change the result, such as two inputs in a row).
+ * not change the result, such as two inputs in a row). When the student
+ * draws the arrows, every slot is interchangeable: the arrows decide the
+ * flow, so only the set of symbols placed matters, not where they sit.
  */
-export function check(level: Level, placements: Placements): CheckResult {
+export function check(
+  level: Level,
+  placements: Placements,
+  drawArrows = false,
+): CheckResult {
   const correct: string[] = [];
   const wrong: string[] = [];
   const empty: string[] = [];
@@ -77,7 +83,10 @@ export function check(level: Level, placements: Placements): CheckResult {
     return `${item.shape}|${item.text}`;
   };
   const groupOf = new Map<string, string[]>();
-  for (const group of level.interchangeable ?? []) {
+  const groups = drawArrows
+    ? [level.nodes.map((n) => n.id)]
+    : (level.interchangeable ?? []);
+  for (const group of groups) {
     for (const id of group) groupOf.set(id, group);
   }
   const remaining = new Map<string[], string[]>();

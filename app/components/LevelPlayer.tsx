@@ -247,8 +247,8 @@ export function LevelPlayer({
   const handleCheck = () => {
     const slots = drawShapes
       ? checkShapes(level, shapePlacements)
-      : check(level, placements);
-    const edgeResult = draw ? checkEdges(level, edges) : null;
+      : check(level, placements, draw);
+    const edgeResult = draw ? checkEdges(level, edges, placements) : null;
     const decisionEdges = drawShapes
       ? level.edges.filter(
           (edge) => isDecisionNode(level, edge.from) && edge.label,

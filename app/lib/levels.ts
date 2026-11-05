@@ -708,7 +708,7 @@ const baseLevels: Level[] = [
       title: "Largest of Five",
       topic: "Iteration and selection",
       instructions:
-        "Input five numbers and output the largest. Keep track of the biggest so far. Start is already placed for you.",
+        "Input five positive numbers and output the largest. Keep track of the biggest so far. Start is already placed for you.",
     },
     [
       ["start", 1, 0, "terminator", "Start", true],

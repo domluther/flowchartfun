@@ -6,6 +6,11 @@ export const MODE_OPTIONS: {
   blurb: string;
 }[] = [
   {
+    id: "shapes",
+    label: "Draw shapes",
+    blurb: "Draw shapes: add the correct flowchart shape to each labelled box.",
+  },
+  {
     id: "guided",
     label: "Guided",
     blurb: "Guided: the arrows are already drawn. Just place the symbols.",
@@ -14,11 +19,6 @@ export const MODE_OPTIONS: {
     id: "draw",
     label: "Draw arrows",
     blurb: "Draw arrows: place the symbols and draw the arrows yourself.",
-  },
-  {
-    id: "shapes",
-    label: "Draw shapes",
-    blurb: "Draw shapes: add the correct flowchart shape to each labelled box.",
   },
 ];
 

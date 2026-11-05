@@ -11,6 +11,12 @@ const BASE = process.env.BASE_URL ?? `http://localhost:${PORT}`;
 const OUT = new URL("../worksheets/", import.meta.url);
 
 const MODES = {
+  shapes: {
+    title: "Draw shapes",
+    file: "draw-shapes.pdf",
+    howTo:
+      "The text and arrows are already drawn. Draw the correct flowchart shape around the text in each box, and write Yes or No on each arrow leaving a decision.",
+  },
   guided: {
     title: "Guided",
     file: "guided.pdf",
@@ -22,12 +28,6 @@ const MODES = {
     file: "draw-arrows.pdf",
     howTo:
       "No arrows are drawn. Decide which symbol belongs in each numbered box and draw it in (or cut out the symbols and stick them in), then draw every arrow between them. Arrows leaving a diamond must be labelled Yes or No. Some symbols are not needed.",
-  },
-  shapes: {
-    title: "Draw shapes",
-    file: "draw-shapes.pdf",
-    howTo:
-      "The text and arrows are already drawn. Draw the correct flowchart shape around the text in each box, and write Yes or No on each arrow leaving a decision.",
   },
 };
 
