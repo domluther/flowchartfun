@@ -8,16 +8,17 @@ A flowchart-practice website for OCR GCSE Computer Science (J277), made by a tea
 
 - Repo: https://github.com/domluther/flowchartfun (branch `main`)
 - Live: https://flowchartfun.netlify.app (Netlify auto-deploys from GitHub)
-- 30 levels in three **tiers** (Easy, Medium, Hard; 10 each). Each level can be played in two **modes**.
+- 30 levels in three **tiers** (Easy, Medium, Hard; 10 each). Each level can be played in three **modes**.
 
 ### Vocabulary (do not mix these up)
 
 | Term            | Meaning                                                                                                                                              |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Tier**        | Level difficulty group: `easy`, `medium`, `hard` (`Tier` type, `level.tier`).                                                                        |
-| **Mode**        | How a level is played: `guided` or `draw` (`Mode` type).                                                                                             |
+| **Mode**        | How a level is played: `guided`, `draw` or `shapes` (`Mode` type).                                                                                   |
 | **Guided**      | Arrows are pre-drawn. The student drags (or clicks) symbols into slots.                                                                              |
 | **Draw arrows** | The student places the symbols, then drags arrows between connection points. Arrows leaving a diamond must be labelled Yes or No. URL: `?mode=draw`. |
+| **Draw shapes** | Text and arrows are pre-drawn. The student places shapes from a reusable toolbox. URL: `?mode=shapes`.                                               |
 
 ## Stack and conventions
 
@@ -28,14 +29,14 @@ A flowchart-practice website for OCR GCSE Computer Science (J277), made by a tea
 
 ### Commands
 
-| Command                       | Purpose                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `pnpm dev`                    | Dev server on http://localhost:5173                                                 |
-| `pnpm lint` / `pnpm lint:fix` | Biome check / auto-fix                                                              |
-| `pnpm typecheck`              | `react-router typegen && tsc`                                                       |
-| `pnpm test`                   | Jest (about 490 tests)                                                              |
-| `pnpm test:e2e`               | Playwright (about 154 tests, about 1.5 min; starts its own dev server on port 5173) |
-| `pnpm build`                  | Production build into `build/client`                                                |
+| Command                       | Purpose                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm dev`                    | Dev server on http://localhost:5173                                               |
+| `pnpm lint` / `pnpm lint:fix` | Biome check / auto-fix                                                            |
+| `pnpm typecheck`              | `react-router typegen && tsc`                                                     |
+| `pnpm test`                   | Jest (about 500 tests)                                                            |
+| `pnpm test:e2e`               | Playwright (about 226 tests, about 2 min; starts its own dev server on port 5173) |
+| `pnpm build`                  | Production build into `build/client`                                              |
 
 **Definition of done for any change:** `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm test:e2e` all pass. Add or extend tests for new behaviour.
 
@@ -54,7 +55,7 @@ app/
   routes/home.tsx        tiered menu, mode toggle, per-tier progress
   routes/level.tsx       loads a level by id, handles unknown ids
   components/
-    LevelPlayer.tsx      the game screen for both modes
+    LevelPlayer.tsx      the game screen for all modes
     ArrowLayer.tsx       SVG arrows, drag preview, Yes/No labels
   lib/
     types.ts             Level, NodeDef, EdgeDef, Item, Tier, Mode, Side, Shape
@@ -80,7 +81,7 @@ e2e/levels.spec.ts       Playwright suite
 - **Interchangeable slots**: `level.interchangeable` lists groups of slot ids whose order doesn't matter (for example two consecutive inputs). The checker treats each group as a multiset. The groups are defined in `INTERCHANGEABLE` in `levels.ts`, keyed by level id, and attached when `levels` is exported.
 - **Arrows** (`edges.ts` `checkEdges`, draw mode only): arrow sides are ignored. The arrow set must match exactly. Extra, missing or reversed arrows are wrong, and so is an unlabelled or mislabelled diamond exit. There is one arrow per ordered pair of nodes, and edge ids are `from->to`.
 - Draw mode shows the Yes/No chooser only when the source slot currently holds a decision symbol.
-- Progress is saved in `localStorage` under `flowchartfun-progress-v3` as `{guided: number[], draw: number[]}`. **Bump the key version if the shape changes.**
+- Progress is saved in `localStorage` under `flowchartfun-progress-v4` as `{guided: number[], draw: number[], shapes: number[]}`. The reader migrates guided/draw progress from v3. **Bump the key version if the shape changes.**
 
 ## Adding or editing levels
 
@@ -127,13 +128,13 @@ Rules:
 
 ### Playwright (`e2e/levels.spec.ts`)
 
-It solves every level in both modes, checks that swapped symbols are rejected, tests each interchangeable group's alternative order, and tests the home page, progress and draw-mode behaviours. Known workarounds, which you should keep:
+It solves every level in all modes, checks that swapped symbols are rejected, tests each interchangeable group's alternative order, and tests the home page, progress and draw-mode behaviours. Known workarounds, which you should keep:
 
 - `locator.dragTo` scrolls mid-drag on tall pages. Symbol drops use dispatched DOM `dragstart`/`dragover`/`drop` events with a shared `DataTransfer`. Arrow drawing uses real mouse moves.
 - Wait for `networkidle` after `goto`. Events fired before React hydrates are lost.
 - Straight arrows have a zero-width bounding box, so Playwright treats them as hidden. Use `click({ force: true })` to delete one.
 - The viewport is 1280x2000 (set **inside** the project's `use` in `playwright.config.ts`, because `devices[...]` overrides a top-level viewport). A shorter viewport breaks `elementFromPoint` for off-screen drop targets.
-- Any new level must pass the generic solve and swap tests in both modes. New interactions need their own tests.
+- Any new level must pass the generic solve and swap tests in all modes. New interactions need their own tests.
 
 ## Gotchas
 
@@ -146,7 +147,7 @@ It solves every level in both modes, checks that swapped symbols are rejected, t
 
 - More levels or an extra tier, and a level-select showing the best attempt.
 - Hints, a "show solution" button, or a count of checks used.
-- Printable or exportable flowcharts, and teacher view or class progress. Progress is local to the browser only.
+- Teacher view or class progress. Progress is local to the browser only. (Printable PDF workbooks already exist: `pnpm worksheets`, see the README.)
 - Pseudocode-to-flowchart or flowchart-to-pseudocode tasks.
 - Touch support for arrow drawing, and keyboard accessibility for drag actions.
 - Allowing more interchangeable orderings, such as the output order inside loops.

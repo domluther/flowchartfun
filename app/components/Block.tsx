@@ -22,7 +22,13 @@ function colour(item: Item) {
   }
 }
 
-export function Block({ item }: { item: Item }) {
+export function Block({
+  item,
+  showText = true,
+}: {
+  item: Item;
+  showText?: boolean;
+}) {
   const rounded =
     item.shape === "terminator"
       ? "rounded-full"
@@ -40,7 +46,7 @@ export function Block({ item }: { item: Item }) {
       className={`flex h-full w-full items-center justify-center text-center font-semibold leading-tight text-white ${colour(item)} ${rounded} ${padding} ${item.shape === "io" ? "italic" : ""}`}
       style={{ clipPath: clip[item.shape] }}
     >
-      {item.text}
+      {showText && item.text}
     </div>
   );
 }

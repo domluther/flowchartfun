@@ -15,7 +15,9 @@ import {
   bankItems,
   type CheckResult,
   check,
+  checkShapes,
   initialPlacements,
+  initialShapePlacements,
   itemById,
   place,
   remove,
@@ -32,13 +34,16 @@ import {
   pathMidpoint,
   routeEdge,
 } from "../lib/layout";
-import { withMode } from "../lib/mode";
+import { MODE_OPTIONS, withMode } from "../lib/mode";
 import type {
+  EdgeDef,
   Item,
   Level,
   Mode,
   NodeDef,
   Placements,
+  Shape,
+  ShapePlacements,
   Side,
 } from "../lib/types";
 import { ArrowLayer, type ArrowView } from "./ArrowLayer";
@@ -49,9 +54,15 @@ interface Endpoint {
   side: Side;
 }
 
+interface ShapeDrag {
+  shape: Shape;
+  pointerId: number;
+}
+
 interface Result {
   slots: CheckResult;
   edges: EdgeCheck | null;
+  labels: EdgeCheck | null;
   solved: boolean;
 }
 
@@ -68,6 +79,36 @@ const HANDLE_POS: Record<Side, string> = {
   l: "left-0 top-1/2",
   r: "left-full top-1/2",
 };
+const SHAPE_TOOLS: {
+  shape: Shape;
+  label: string;
+  item: Item;
+}[] = [
+  {
+    shape: "terminator",
+    label: "Stadium (start/stop)",
+    item: { id: "tool-terminator", shape: "terminator", text: "Start" },
+  },
+  {
+    shape: "io",
+    label: "Parallelogram (input/output)",
+    item: { id: "tool-io", shape: "io", text: "Input/Output" },
+  },
+  {
+    shape: "process",
+    label: "Rectangle (process)",
+    item: { id: "tool-process", shape: "process", text: "Process" },
+  },
+  {
+    shape: "decision",
+    label: "Rhombus (decision)",
+    item: { id: "tool-decision", shape: "decision", text: "Decision" },
+  },
+];
+
+function isShape(value: string): value is Shape {
+  return SHAPE_TOOLS.some((tool) => tool.shape === value);
+}
 
 function hash(s: string) {
   let h = 0;
@@ -94,18 +135,19 @@ function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-function feedback(level: Level, r: Result) {
+function feedback(level: Level, r: Result, drawShapes: boolean) {
   const parts: string[] = [];
+  const noun = drawShapes ? "shapes" : "symbols";
   if (!r.slots.solved) {
     parts.push(
-      `${r.slots.correct.length} of ${level.nodes.length} symbols correct${
+      `${r.slots.correct.length} of ${level.nodes.length} ${noun} correct${
         r.slots.empty.length
           ? `, ${plural(r.slots.empty.length, "slot")} still empty`
           : ""
       }.`,
     );
   } else {
-    parts.push("All the symbols are in the right place.");
+    parts.push(`All the ${noun} are in the right place.`);
   }
   if (r.edges && !r.edges.solved) {
     const e = r.edges;
@@ -115,23 +157,53 @@ function feedback(level: Level, r: Result) {
       }.${e.wrong ? " Red arrows are wrong, or a diamond arrow is missing its Yes/No label." : ""}`,
     );
   }
+  if (r.labels && !r.labels.solved) {
+    const total =
+      r.labels.correct.length + r.labels.wrong.length + r.labels.missing;
+    parts.push(
+      `${r.labels.correct.length} of ${total} Yes/No labels correct${
+        r.labels.missing ? `, ${r.labels.missing} still to place` : ""
+      }.`,
+    );
+  }
   return parts.join(" ");
+}
+
+const edgeId = (edge: EdgeDef) => `${edge.from}->${edge.to}`;
+
+function isDecisionNode(level: Level, nodeId: string) {
+  const node = level.nodes.find((candidate) => candidate.id === nodeId);
+  return (
+    node !== undefined &&
+    level.items.find((item) => item.id === node.answer)?.shape === "decision"
+  );
 }
 
 export function LevelPlayer({
   level,
   mode = "guided",
+  previousId,
   nextId,
 }: {
   level: Level;
   mode?: Mode;
+  previousId?: number;
   nextId?: number;
 }) {
   const draw = mode === "draw";
+  const drawShapes = mode === "shapes";
   const [placements, setPlacements] = useState<Placements>(() =>
     initialPlacements(level),
   );
+  const [shapePlacements, setShapePlacements] = useState<ShapePlacements>(() =>
+    initialShapePlacements(level),
+  );
+  const [shapeEdgeLabels, setShapeEdgeLabels] = useState<
+    Record<string, EdgeLabel | null>
+  >({});
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedShape, setSelectedShape] = useState<Shape | null>(null);
+  const [shapeDrag, setShapeDrag] = useState<ShapeDrag | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [edges, setEdges] = useState<UserEdge[]>([]);
   const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
@@ -162,18 +234,50 @@ export function LevelPlayer({
 
   const reset = () => {
     setPlacements(initialPlacements(level));
+    setShapePlacements(initialShapePlacements(level));
+    setShapeEdgeLabels({});
     setEdges([]);
     setSelected(null);
+    setSelectedShape(null);
     setSelectedEdge(null);
     setPending(null);
     setResult(null);
   };
 
   const handleCheck = () => {
-    const slots = check(level, placements);
+    const slots = drawShapes
+      ? checkShapes(level, shapePlacements)
+      : check(level, placements);
     const edgeResult = draw ? checkEdges(level, edges) : null;
-    const solved = slots.solved && (edgeResult?.solved ?? true);
-    setResult({ slots, edges: edgeResult, solved });
+    const decisionEdges = drawShapes
+      ? level.edges.filter(
+          (edge) => isDecisionNode(level, edge.from) && edge.label,
+        )
+      : [];
+    const correctLabels = decisionEdges
+      .filter((edge) => shapeEdgeLabels[edgeId(edge)] === edge.label)
+      .map(edgeId);
+    const wrongLabels = decisionEdges
+      .filter((edge) => {
+        const label = shapeEdgeLabels[edgeId(edge)];
+        return label !== null && label !== undefined && label !== edge.label;
+      })
+      .map(edgeId);
+    const missingLabels =
+      decisionEdges.length - correctLabels.length - wrongLabels.length;
+    const labelResult: EdgeCheck | null = drawShapes
+      ? {
+          correct: correctLabels,
+          wrong: wrongLabels,
+          missing: missingLabels,
+          solved: missingLabels === 0 && wrongLabels.length === 0,
+        }
+      : null;
+    const solved =
+      slots.solved &&
+      (edgeResult?.solved ?? true) &&
+      (labelResult?.solved ?? true);
+    setResult({ slots, edges: edgeResult, labels: labelResult, solved });
     setSelectedEdge(null);
     setPending(null);
     if (solved) saveCompleted(level.id, mode);
@@ -229,6 +333,35 @@ export function LevelPlayer({
     };
   }, [dragFrom, level]);
 
+  useEffect(() => {
+    if (!shapeDrag) return;
+    const drag = shapeDrag;
+    const up = (e: PointerEvent) => {
+      if (e.pointerId !== drag.pointerId) return;
+      const el =
+        document.elementFromPoint?.(e.clientX, e.clientY) ??
+        (e.target as Element | null);
+      const slot =
+        el instanceof Element
+          ? el.closest<HTMLElement>("[data-slot]")?.dataset.slot
+          : undefined;
+      if (slot) {
+        setShapePlacements((current) => ({ ...current, [slot]: drag.shape }));
+        setResult(null);
+      }
+      setShapeDrag(null);
+    };
+    const cancel = (e: PointerEvent) => {
+      if (e.pointerId === drag.pointerId) setShapeDrag(null);
+    };
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [shapeDrag]);
+
   const handleClick = (ep: Endpoint) => {
     if (!pending) {
       setPending(ep);
@@ -241,6 +374,16 @@ export function LevelPlayer({
   };
 
   const slotClick = (slotId: string) => {
+    if (drawShapes) {
+      if (selectedShape) {
+        setShapePlacements((current) => ({
+          ...current,
+          [slotId]: selectedShape,
+        }));
+      }
+      setResult(null);
+      return;
+    }
     if (draw && pending && placements[slotId]) {
       const node = level.nodes.find((n) => n.id === slotId);
       if (node && pending.slot !== slotId) {
@@ -265,6 +408,14 @@ export function LevelPlayer({
   const onDrop = (e: React.DragEvent, slotId: string) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
+    if (drawShapes) {
+      const shape = id.startsWith("shape:") ? id.slice("shape:".length) : "";
+      if (isShape(shape)) {
+        setShapePlacements((current) => ({ ...current, [slotId]: shape }));
+        setResult(null);
+      }
+      return;
+    }
     if (level.nodes.find((n) => n.id === slotId)?.fixed) return;
     if (id) update(place(level, placements, slotId, id));
     setSelected(null);
@@ -285,7 +436,28 @@ export function LevelPlayer({
     },
   });
 
+  const shapeDragProps = (shape: Shape) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData("text/plain", `shape:${shape}`);
+      e.dataTransfer.effectAllowed = "copy";
+      setSelectedShape(shape);
+    },
+  });
+
+  const labelDragProps = (label: EdgeLabel) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => {
+      e.dataTransfer.setData("text/plain", `label:${label}`);
+      e.dataTransfer.effectAllowed = "copy";
+    },
+  });
+
   const slotText = (slotId: string) => {
+    if (drawShapes) {
+      const node = level.nodes.find((n) => n.id === slotId);
+      return node ? itemById(level, node.answer).text : "";
+    }
     const id = placements[slotId];
     return id ? itemById(level, id).text : "empty slot";
   };
@@ -304,10 +476,19 @@ export function LevelPlayer({
         description: `Arrow from ${slotText(e.from)} to ${slotText(e.to)}${e.label ? `, ${e.label}` : ""}`,
       }))
     : level.edges.map((e) => ({
-        id: `${e.from}-${e.fromSide}-${e.to}-${e.toSide}`,
+        id: drawShapes
+          ? edgeId(e)
+          : `${e.from}-${e.fromSide}-${e.to}-${e.toSide}`,
         edge: e,
-        label: e.label,
-        description: "",
+        label: drawShapes ? (shapeEdgeLabels[edgeId(e)] ?? undefined) : e.label,
+        needsLabel: drawShapes && isDecisionNode(level, e.from),
+        labelPrompt:
+          drawShapes &&
+          isDecisionNode(level, e.from) &&
+          !shapeEdgeLabels[edgeId(e)]
+            ? "Drop Yes/No"
+            : undefined,
+        description: `from ${slotText(e.from)} to ${slotText(e.to)}`,
       }));
 
   const preview = (() => {
@@ -322,7 +503,11 @@ export function LevelPlayer({
     : null;
 
   const filled = level.nodes.filter((n) => placements[n.id]).length;
-  const otherMode: Mode = draw ? "guided" : "draw";
+  const shapeFilled = level.nodes.filter(
+    (node) => shapePlacements[node.id],
+  ).length;
+  const hasDecisions =
+    drawShapes && level.nodes.some((node) => isDecisionNode(level, node.id));
   const levelPath = `/level/${level.id}`;
 
   return (
@@ -338,13 +523,23 @@ export function LevelPlayer({
                 {level.tier}
               </span>
               <span
-                className={`mr-2 rounded-full px-2 py-0.5 font-semibold ${draw ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}
+                className={`mr-2 rounded-full px-2 py-0.5 font-semibold ${draw ? "bg-amber-100 text-amber-800" : drawShapes ? "bg-purple-100 text-purple-800" : "bg-green-100 text-green-800"}`}
               >
-                {draw ? "Draw arrows" : "Guided"}
+                {MODE_OPTIONS.find((option) => option.id === mode)?.label}
               </span>
-              <Link className="underline" to={withMode(levelPath, otherMode)}>
-                Switch to {otherMode === "draw" ? "draw arrows" : "guided"}
-              </Link>
+              {MODE_OPTIONS.filter((option) => option.id !== mode).map(
+                (option, index) => (
+                  <span key={option.id}>
+                    {index > 0 && " · "}
+                    <Link
+                      className="underline"
+                      to={withMode(levelPath, option.id)}
+                    >
+                      Switch to {option.label.toLowerCase()}
+                    </Link>
+                  </span>
+                ),
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -371,6 +566,44 @@ export function LevelPlayer({
           </div>
         </div>
 
+        <nav
+          aria-label="Puzzle navigation"
+          className="mt-4 flex items-center justify-between"
+        >
+          {previousId ? (
+            <Link
+              to={withMode(`/level/${previousId}`, mode)}
+              className="rounded-lg bg-blue-100 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-200"
+            >
+              ← Previous puzzle
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg bg-gray-100 px-4 py-2 font-semibold text-gray-400"
+            >
+              ← Previous puzzle
+            </button>
+          )}
+          {nextId ? (
+            <Link
+              to={withMode(`/level/${nextId}`, mode)}
+              className="rounded-lg bg-blue-100 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-200"
+            >
+              Next puzzle →
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg bg-gray-100 px-4 py-2 font-semibold text-gray-400"
+            >
+              Next puzzle →
+            </button>
+          )}
+        </nav>
+
         <p className="mt-4 border-l-4 border-blue-500 bg-blue-50 p-4 text-blue-900">
           {level.instructions}
         </p>
@@ -387,6 +620,14 @@ export function LevelPlayer({
                 Now click the symbol the arrow should point to.
               </strong>
             )}
+          </p>
+        )}
+        {drawShapes && (
+          <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+            <strong>Draw shapes:</strong> drag a shape from the Elements
+            toolbox, or tap/select one and tap a box. The toolbox keeps a copy,
+            so you can reuse each shape.
+            {hasDecisions && " Drag Yes or No onto each decision line as well."}
           </p>
         )}
 
@@ -412,7 +653,7 @@ export function LevelPlayer({
                 )}
               </>
             ) : (
-              feedback(level, result)
+              feedback(level, result, drawShapes)
             )}
           </div>
         )}
@@ -440,6 +681,17 @@ export function LevelPlayer({
                       }
                     : undefined
                 }
+                onLabelDrop={
+                  drawShapes
+                    ? (id, label) => {
+                        setShapeEdgeLabels((current) => ({
+                          ...current,
+                          [id]: label,
+                        }));
+                        setResult(null);
+                      }
+                    : undefined
+                }
                 preview={preview}
               />
 
@@ -447,6 +699,10 @@ export function LevelPlayer({
                 const { x, y } = nodePos(n);
                 const itemId = placements[n.id];
                 const item = itemId ? itemById(level, itemId) : null;
+                const answer = drawShapes ? itemById(level, n.answer) : null;
+                const shape = shapePlacements[n.id];
+                const displayedItem =
+                  drawShapes && answer && shape ? { ...answer, shape } : item;
                 const status = result?.slots.correct.includes(n.id)
                   ? "correct"
                   : result?.slots.wrong.includes(n.id)
@@ -465,16 +721,26 @@ export function LevelPlayer({
                       onDrop={(e) => onDrop(e, n.id)}
                       data-testid={`slot-${n.id}`}
                       aria-label={
-                        item
-                          ? `Slot ${i + 1}: ${item.text}`
-                          : `Empty slot ${i + 1}`
+                        drawShapes && answer
+                          ? `Slot ${i + 1}: ${answer.text}${shape ? `, ${shape}` : ", no shape"}`
+                          : item
+                            ? `Slot ${i + 1}: ${item.text}`
+                            : `Empty slot ${i + 1}`
                       }
-                      aria-disabled={n.fixed || undefined}
+                      aria-disabled={(!drawShapes && n.fixed) || undefined}
                       onClick={() => slotClick(n.id)}
-                      {...(item && !n.fixed ? dragProps(item) : {})}
-                      className={`h-full w-full ${item ? "" : "rounded-lg border-2 border-dashed border-gray-400 bg-white/60 text-sm text-gray-400 hover:border-blue-400"} ${selected && !n.fixed ? "ring-2 ring-blue-400" : ""}`}
+                      {...(item && !drawShapes && !n.fixed
+                        ? dragProps(item)
+                        : {})}
+                      className={`h-full w-full ${displayedItem ? "" : "rounded-lg border-2 border-dashed border-gray-400 bg-white/60 text-sm text-gray-700 hover:border-blue-400"} ${selected && !n.fixed ? "ring-2 ring-blue-400" : ""} ${drawShapes && selectedShape ? "cursor-pointer" : ""}`}
                     >
-                      {item ? <Block item={item} /> : i + 1}
+                      {displayedItem ? (
+                        <Block item={displayedItem} />
+                      ) : drawShapes && answer ? (
+                        <span className="px-2">{answer.text}</span>
+                      ) : (
+                        i + 1
+                      )}
                     </button>
                     {draw &&
                       item &&
@@ -565,27 +831,66 @@ export function LevelPlayer({
           >
             <h2 className="mb-3 font-bold text-gray-700">Elements</h2>
             <p className="mb-3 text-xs text-gray-600">
-              Drag a symbol onto the chart, or click it and then click a slot.{" "}
-              {filled}/{level.nodes.length} placed.
+              {drawShapes
+                ? "Drag a shape onto a labelled box, or select it and click a box."
+                : "Drag a symbol onto the chart, or click it and then click a slot."}{" "}
+              {drawShapes
+                ? `${shapeFilled}/${level.nodes.length} shapes placed.`
+                : `${filled}/${level.nodes.length} placed.`}
               {draw && ` ${edges.length}/${level.edges.length} arrows drawn.`}
             </p>
             <div className="flex flex-col items-center gap-3">
-              {bank.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  data-testid={`item-${item.id}`}
-                  aria-pressed={selected === item.id}
-                  onClick={() =>
-                    setSelected(selected === item.id ? null : item.id)
-                  }
-                  {...dragProps(item)}
-                  className={`h-[72px] w-full max-w-[220px] cursor-grab ${selected === item.id ? "scale-105 drop-shadow-[0_0_6px_#2563eb]" : ""}`}
-                >
-                  <Block item={item} />
-                </button>
-              ))}
-              {bank.length === 0 && (
+              {drawShapes &&
+                hasDecisions &&
+                (["Yes", "No"] as EdgeLabel[]).map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    data-testid={`label-tool-${label}`}
+                    aria-label={`Drag ${label} label`}
+                    {...labelDragProps(label)}
+                    className="w-full max-w-[220px] cursor-grab rounded-lg bg-white px-4 py-3 text-center font-bold text-gray-800 shadow"
+                  >
+                    {label}
+                  </button>
+                ))}
+              {drawShapes
+                ? SHAPE_TOOLS.map(({ shape, label, item: toolItem }) => (
+                    <button
+                      key={shape}
+                      type="button"
+                      data-testid={`shape-${shape}`}
+                      aria-label={label}
+                      aria-pressed={selectedShape === shape}
+                      onClick={() => setSelectedShape(shape)}
+                      onPointerDown={(e) => {
+                        if (!drawShapes || e.pointerType === "mouse") return;
+                        e.preventDefault();
+                        setSelectedShape(shape);
+                        setShapeDrag({ shape, pointerId: e.pointerId });
+                      }}
+                      {...shapeDragProps(shape)}
+                      className={`h-[72px] w-full max-w-[220px] touch-none cursor-grab ${selectedShape === shape ? "scale-105 drop-shadow-[0_0_6px_#2563eb]" : ""}`}
+                    >
+                      <Block item={toolItem} showText={false} />
+                    </button>
+                  ))
+                : bank.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      data-testid={`item-${item.id}`}
+                      aria-pressed={selected === item.id}
+                      onClick={() =>
+                        setSelected(selected === item.id ? null : item.id)
+                      }
+                      {...dragProps(item)}
+                      className={`h-[72px] w-full max-w-[220px] cursor-grab ${selected === item.id ? "scale-105 drop-shadow-[0_0_6px_#2563eb]" : ""}`}
+                    >
+                      <Block item={item} />
+                    </button>
+                  ))}
+              {!drawShapes && bank.length === 0 && (
                 <p className="text-sm text-gray-500">All symbols placed.</p>
               )}
             </div>

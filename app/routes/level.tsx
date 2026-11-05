@@ -23,12 +23,14 @@ export default function LevelRoute() {
     );
   }
 
+  const previousId = levels.find((l) => l.id === id - 1)?.id;
   const nextId = levels.find((l) => l.id === id + 1)?.id;
   return (
     <LevelPlayer
       key={`${level.id}-${mode}`}
       level={level}
       mode={mode}
+      previousId={previousId}
       nextId={nextId}
     />
   );

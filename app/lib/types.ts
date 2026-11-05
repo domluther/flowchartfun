@@ -43,4 +43,7 @@ export interface Level {
 /** slot id -> placed item id */
 export type Placements = Record<string, string | null>;
 
-export type Mode = "guided" | "draw";
+/** slot id -> drawn shape */
+export type ShapePlacements = Record<string, Shape | null>;
+
+export type Mode = "guided" | "draw" | "shapes";

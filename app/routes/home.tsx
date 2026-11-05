@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { loadCompleted } from "../lib/game";
 import { levels, TIERS } from "../lib/levels";
-import { parseMode, withMode } from "../lib/mode";
-import type { Mode } from "../lib/types";
+import { MODE_OPTIONS, parseMode, withMode } from "../lib/mode";
 
 export function meta() {
   return [
@@ -15,19 +14,6 @@ export function meta() {
     },
   ];
 }
-
-const MODES: { id: Mode; label: string; blurb: string }[] = [
-  {
-    id: "guided",
-    label: "Guided",
-    blurb: "Guided: the arrows are already drawn. Just place the symbols.",
-  },
-  {
-    id: "draw",
-    label: "Draw arrows",
-    blurb: "Draw arrows: place the symbols and draw the arrows yourself.",
-  },
-];
 
 export default function Home() {
   const [done, setDone] = useState<number[]>([]);
@@ -43,7 +29,7 @@ export default function Home() {
         </p>
         <fieldset className="mt-4 inline-flex rounded-full bg-white p-1 shadow">
           <legend className="sr-only">Mode</legend>
-          {MODES.map((m) => (
+          {MODE_OPTIONS.map((m) => (
             <Link
               key={m.id}
               to={withMode("/", m.id)}
@@ -55,7 +41,7 @@ export default function Home() {
           ))}
         </fieldset>
         <p className="mt-1 text-sm text-gray-500">
-          {MODES.find((m) => m.id === mode)?.blurb}
+          {MODE_OPTIONS.find((m) => m.id === mode)?.blurb}
         </p>
         <p className="mt-1 text-sm text-gray-500">
           {done.length} of {levels.length} levels complete

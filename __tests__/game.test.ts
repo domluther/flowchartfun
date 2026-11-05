@@ -1,9 +1,13 @@
 import {
   bankItems,
   check,
+  checkShapes,
   initialPlacements,
+  initialShapePlacements,
+  loadCompleted,
   place,
   remove,
+  saveCompleted,
 } from "../app/lib/game";
 import { routeEdge } from "../app/lib/layout";
 import { getLevel, levels } from "../app/lib/levels";
@@ -90,6 +94,56 @@ describe("interchangeable steps", () => {
     p.inA = "inB";
     p.inB = "inA";
     expect(check(level, p).solved).toBe(true);
+  });
+
+  describe("shape checking", () => {
+    const level = getLevel(11) as Level;
+    const solution = () =>
+      Object.fromEntries(
+        level.nodes.map((node) => [
+          node.id,
+          level.items.find((item) => item.id === node.answer)?.shape ?? null,
+        ]),
+      );
+
+    it("accepts the correct shape in every labelled slot, including fixed nodes", () => {
+      expect(checkShapes(level, solution()).solved).toBe(true);
+    });
+
+    it("reports incorrect and empty shape slots", () => {
+      const placements = solution();
+      placements.start = "io";
+      placements.in = null;
+      const result = checkShapes(level, placements);
+      expect(result.solved).toBe(false);
+      expect(result.wrong).toContain("start");
+      expect(result.empty).toContain("in");
+    });
+
+    it("pre-fills fixed shapes", () => {
+      const level30 = getLevel(30) as Level;
+      const placements = initialShapePlacements(level30);
+
+      expect(placements.start).toBe("terminator");
+      expect(placements.in).toBeNull();
+      expect(checkShapes(level30, placements).empty).toHaveLength(
+        level30.nodes.length - 1,
+      );
+    });
+  });
+
+  it("migrates existing progress into the expanded mode storage", () => {
+    localStorage.clear();
+    localStorage.setItem(
+      "flowchartfun-progress-v3",
+      JSON.stringify({ guided: [1], draw: [2] }),
+    );
+
+    expect(loadCompleted("guided")).toEqual([1]);
+    expect(saveCompleted(3, "shapes")).toEqual([3]);
+    expect(
+      JSON.parse(localStorage.getItem("flowchartfun-progress-v4") ?? "{}"),
+    ).toEqual({ guided: [1], draw: [2], shapes: [3] });
   });
 
   it("still rejects an independent step swapped with a dependent one", () => {

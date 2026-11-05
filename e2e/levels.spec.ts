@@ -3,11 +3,11 @@ import { levels, TIERS } from "../app/lib/levels";
 import type { Level } from "../app/lib/types";
 
 const SIDE_KEY = { top: "t", bottom: "b", left: "l", right: "r" } as const;
-type Mode = "guided" | "draw";
-const modes: Mode[] = ["guided", "draw"];
+type Mode = "guided" | "draw" | "shapes";
+const modes: Mode[] = ["guided", "draw", "shapes"];
 
 const levelUrl = (level: Level, mode: Mode) =>
-  `/level/${level.id}${mode === "draw" ? "?mode=draw" : ""}`;
+  `/level/${level.id}${mode === "guided" ? "" : `?mode=${mode}`}`;
 
 const sideKey = (side: string) =>
   SIDE_KEY[side as keyof typeof SIDE_KEY] ?? side;
@@ -40,6 +40,38 @@ async function placeSymbols(page: Page, level: Level, how: "drag" | "click") {
   }
   const total = level.nodes.length;
   await expect(page.getByText(`${total}/${total} placed.`)).toBeVisible();
+}
+
+async function placeShapes(page: Page, level: Level, how: "drag" | "click") {
+  for (const node of level.nodes) {
+    const shape = level.items.find((item) => item.id === node.answer)?.shape;
+    if (!shape) throw new Error(`Missing answer shape for ${node.id}`);
+    const tool = page.getByTestId(`shape-${shape}`);
+    const slot = page.getByTestId(`slot-${node.id}`);
+    if (how === "drag") await dragAndDrop(tool, slot);
+    else {
+      await tool.click();
+      await slot.click();
+    }
+  }
+  await expect(
+    page.getByText(
+      `${level.nodes.length}/${level.nodes.length} shapes placed.`,
+    ),
+  ).toBeVisible();
+}
+
+async function placeDecisionLabels(page: Page, level: Level) {
+  for (const edge of level.edges.filter((candidate) => candidate.label)) {
+    if (!edge.label) continue;
+    await dragAndDrop(
+      page.getByTestId(`label-tool-${edge.label}`),
+      page.getByTestId(`label-drop-${edge.from}->${edge.to}`),
+    );
+    await expect(
+      page.getByTestId(`label-drop-${edge.from}->${edge.to}`),
+    ).toHaveText(edge.label);
+  }
 }
 
 async function dragArrow(
@@ -90,7 +122,12 @@ for (const mode of modes) {
           `Level ${level.id}: ${level.title}`,
         );
         await expect(page.getByText(level.instructions)).toBeVisible();
-        await placeSymbols(page, level, mode === "guided" ? "drag" : "click");
+        if (mode === "shapes") {
+          await placeShapes(page, level, "drag");
+          await placeDecisionLabels(page, level);
+        } else {
+          await placeSymbols(page, level, mode === "guided" ? "drag" : "click");
+        }
         if (mode === "draw") await drawArrows(page, level);
         await page.getByRole("button", { name: "Check Answer" }).click();
         await expect(status(page)).toContainText("Correct");
@@ -109,6 +146,41 @@ for (const mode of modes) {
         page,
       }) => {
         await openLevel(page, level, mode);
+        if (mode === "shapes") {
+          const pair = level.nodes
+            .flatMap((a, i) =>
+              level.nodes.slice(i + 1).map((b) => [a, b] as const),
+            )
+            .find(([a, b]) => {
+              const aShape = level.items.find(
+                (item) => item.id === a.answer,
+              )?.shape;
+              const bShape = level.items.find(
+                (item) => item.id === b.answer,
+              )?.shape;
+              return aShape !== bShape;
+            });
+          if (!pair) throw new Error("no swappable pair with different shapes");
+          const [a, b] = pair;
+          for (const node of level.nodes) {
+            const answerShape = level.items.find(
+              (item) => item.id === node.answer,
+            )?.shape;
+            const shape =
+              node.id === a.id
+                ? level.items.find((item) => item.id === b.answer)?.shape
+                : node.id === b.id
+                  ? level.items.find((item) => item.id === a.answer)?.shape
+                  : answerShape;
+            if (!shape) throw new Error(`Missing answer shape for ${node.id}`);
+            await page.getByTestId(`shape-${shape}`).click();
+            await page.getByTestId(`slot-${node.id}`).click();
+          }
+          await page.getByRole("button", { name: "Check Answer" }).click();
+          await expect(status(page)).not.toContainText("Correct");
+          return;
+        }
+
         const movable = level.nodes.filter((n) => !n.fixed);
         const sameGroup = (x: string, y: string) =>
           (level.interchangeable ?? []).some(
@@ -143,6 +215,13 @@ for (const mode of modes) {
         page,
       }) => {
         await openLevel(page, level, mode);
+        if (mode === "shapes") {
+          await placeShapes(page, level, "click");
+          await placeDecisionLabels(page, level);
+          await page.getByRole("button", { name: "Check Answer" }).click();
+          await expect(status(page)).toContainText("Correct");
+          return;
+        }
         const answers: Record<string, string> = {};
         for (const group of level.interchangeable ?? []) {
           group.forEach((id, i) => {
@@ -165,14 +244,15 @@ for (const mode of modes) {
     test("progress is saved for this mode only", async ({ page }) => {
       const level = levels[0];
       await openLevel(page, level, mode);
-      await placeSymbols(page, level, "click");
+      if (mode === "shapes") await placeShapes(page, level, "click");
+      else await placeSymbols(page, level, "click");
       if (mode === "draw") await drawArrows(page, level);
       await page.getByRole("button", { name: "Check Answer" }).click();
       await expect(status(page)).toContainText("Correct");
 
       const other: Mode = mode === "guided" ? "draw" : "guided";
       const stored = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("flowchartfun-progress-v3") ?? "{}"),
+        JSON.parse(localStorage.getItem("flowchartfun-progress-v4") ?? "{}"),
       );
       expect(stored[mode]).toContain(level.id);
       expect(stored[other] ?? []).not.toContain(level.id);
@@ -264,6 +344,31 @@ test.describe("draw mode drawing", () => {
   });
 });
 
+test.describe("shape mode decision labels", () => {
+  const level = levels[4];
+
+  test("rejects Yes and No labels dropped on the wrong decision lines", async ({
+    page,
+  }) => {
+    await openLevel(page, level, "shapes");
+    await placeShapes(page, level, "click");
+    const yesEdge = level.edges.find((edge) => edge.label === "Yes");
+    const noEdge = level.edges.find((edge) => edge.label === "No");
+    if (!yesEdge || !noEdge) throw new Error("Missing decision exits");
+
+    await dragAndDrop(
+      page.getByTestId("label-tool-No"),
+      page.getByTestId(`label-drop-${yesEdge.from}->${yesEdge.to}`),
+    );
+    await dragAndDrop(
+      page.getByTestId("label-tool-Yes"),
+      page.getByTestId(`label-drop-${noEdge.from}->${noEdge.to}`),
+    );
+    await page.getByRole("button", { name: "Check Answer" }).click();
+    await expect(status(page)).not.toContainText("Correct");
+  });
+});
+
 test.describe("home page", () => {
   for (const tier of TIERS) {
     test(`lists 10 ${tier.label} levels that open`, async ({ page }) => {
@@ -296,6 +401,17 @@ test.describe("home page", () => {
     for (const level of levels) {
       await expect(
         page.locator(`a[href="/level/${level.id}?mode=draw"]`),
+      ).toHaveCount(1);
+    }
+  });
+
+  test("toggling to draw shapes changes every level link", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Draw shapes" }).click();
+    await expect(page).toHaveURL(/mode=shapes/);
+    for (const level of levels) {
+      await expect(
+        page.locator(`a[href="/level/${level.id}?mode=shapes"]`),
       ).toHaveCount(1);
     }
   });

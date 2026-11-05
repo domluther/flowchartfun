@@ -1,9 +1,18 @@
-import type { Item, Level, Mode, Placements } from "./types";
+import type { Item, Level, Mode, Placements, ShapePlacements } from "./types";
 
 export function initialPlacements(level: Level): Placements {
   const p: Placements = {};
   for (const n of level.nodes) p[n.id] = n.fixed ? n.answer : null;
   return p;
+}
+
+export function initialShapePlacements(level: Level): ShapePlacements {
+  return Object.fromEntries(
+    level.nodes.map((node) => [
+      node.id,
+      node.fixed ? itemById(level, node.answer).shape : null,
+    ]),
+  );
 }
 
 export function itemById(level: Level, id: string): Item {
@@ -108,19 +117,47 @@ export function check(level: Level, placements: Placements): CheckResult {
   };
 }
 
-const KEY = "flowchartfun-progress-v3";
+export function checkShapes(
+  level: Level,
+  placements: ShapePlacements,
+): CheckResult {
+  const correct: string[] = [];
+  const wrong: string[] = [];
+  const empty: string[] = [];
+  for (const node of level.nodes) {
+    const placed = placements[node.id];
+    if (!placed) {
+      empty.push(node.id);
+      continue;
+    }
+    if (placed === itemById(level, node.answer).shape) correct.push(node.id);
+    else wrong.push(node.id);
+  }
+  return {
+    correct,
+    wrong,
+    empty,
+    solved: correct.length === level.nodes.length,
+  };
+}
+
+const KEY = "flowchartfun-progress-v4";
+const LEGACY_KEY = "flowchartfun-progress-v3";
 
 type Progress = Record<Mode, number[]>;
 
 function readProgress(): Progress {
   try {
-    const parsed = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    const parsed = JSON.parse(
+      localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY) ?? "{}",
+    );
     return {
       guided: Array.isArray(parsed.guided) ? parsed.guided : [],
       draw: Array.isArray(parsed.draw) ? parsed.draw : [],
+      shapes: Array.isArray(parsed.shapes) ? parsed.shapes : [],
     };
   } catch {
-    return { guided: [], draw: [] };
+    return { guided: [], draw: [], shapes: [] };
   }
 }
 

@@ -1,3 +1,4 @@
+import type { EdgeLabel } from "../lib/edges";
 import { labelPos, type Point, routeEdge } from "../lib/layout";
 import type { EdgeDef, NodeDef } from "../lib/types";
 
@@ -7,6 +8,7 @@ export interface ArrowView {
   label?: string;
   /** a decision arrow that still needs Yes or No */
   needsLabel?: boolean;
+  labelPrompt?: string;
   status?: "correct" | "wrong";
   description: string;
 }
@@ -28,6 +30,7 @@ export function ArrowLayer({
   selectedId,
   onSelect,
   onDelete,
+  onLabelDrop,
   preview,
 }: {
   width: number;
@@ -37,6 +40,7 @@ export function ArrowLayer({
   selectedId?: string | null;
   onSelect?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onLabelDrop?: (id: string, label: EdgeLabel) => void;
   preview?: { from: Point; to: Point } | null;
 }) {
   const interactive = onSelect !== undefined;
@@ -71,7 +75,9 @@ export function ArrowLayer({
         const lp = labelPos(pts);
         const colour: Colour =
           a.status ?? (a.id === selectedId ? "selected" : "default");
-        const text = a.label ?? (a.needsLabel ? "Yes / No?" : undefined);
+        const text =
+          a.label ?? a.labelPrompt ?? (a.needsLabel ? "Yes / No?" : undefined);
+        const canDropLabel = onLabelDrop !== undefined && a.needsLabel === true;
         const interactiveProps = interactive
           ? {
               role: "button",
@@ -90,15 +96,32 @@ export function ArrowLayer({
               },
             }
           : {};
+        const labelDropProps = canDropLabel
+          ? {
+              role: "button",
+              tabIndex: 0,
+              "aria-label": `Drop Yes or No on arrow: ${a.description}`,
+              className: "pointer-events-auto cursor-copy",
+              onDragOver: (event: React.DragEvent<SVGGElement>) =>
+                event.preventDefault(),
+              onDrop: (event: React.DragEvent<SVGGElement>) => {
+                event.preventDefault();
+                const value = event.dataTransfer.getData("text/plain");
+                if (value === "label:Yes" || value === "label:No") {
+                  onLabelDrop?.(a.id, value === "label:Yes" ? "Yes" : "No");
+                }
+              },
+            }
+          : {};
 
         return (
-          <g key={a.id} {...interactiveProps}>
-            {interactive && (
+          <g key={a.id} {...interactiveProps} {...labelDropProps}>
+            {(interactive || canDropLabel) && (
               <polyline
                 points={points}
                 fill="none"
                 stroke="transparent"
-                strokeWidth="14"
+                strokeWidth={canDropLabel ? "18" : "14"}
               />
             )}
             <polyline
@@ -113,7 +136,8 @@ export function ArrowLayer({
                 x={lp.x}
                 y={lp.y}
                 textAnchor={lp.anchor}
-                className={`text-xs font-bold ${a.needsLabel && !a.label ? "fill-red-600" : "fill-gray-700"}`}
+                data-testid={canDropLabel ? `label-drop-${a.id}` : undefined}
+                className={`text-xs font-bold ${canDropLabel ? "pointer-events-auto" : ""} ${a.needsLabel && !a.label ? "fill-red-600" : "fill-gray-700"}`}
               >
                 {text}
               </text>

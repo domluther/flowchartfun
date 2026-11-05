@@ -84,10 +84,11 @@ it("solves a draw-mode level by drawing arrows and labelling the diamond's exits
   await check(user);
   expect(screen.getByRole("status")).toHaveTextContent("Correct");
   expect(
-    JSON.parse(localStorage.getItem("flowchartfun-progress-v3") ?? "{}"),
+    JSON.parse(localStorage.getItem("flowchartfun-progress-v4") ?? "{}"),
   ).toEqual({
     guided: [],
     draw: [5],
+    shapes: [],
   });
   expect(screen.getByRole("link", { name: /Next level/ })).toHaveAttribute(
     "href",
