@@ -1,7 +1,6 @@
 import type { Config } from "@react-router/dev/config";
 
 export default {
-  // Config options...
-  // Server-side render by default, to enable SPA mode set this to `false`
-  ssr: true,
+  // Static single-page app: deployable to any static host (e.g. Netlify)
+  ssr: false,
 } satisfies Config;
