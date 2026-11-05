@@ -44,8 +44,8 @@ it("solves a level with click-to-place and records progress", async () => {
   await user.click(screen.getByRole("button", { name: "Check Answer" }));
   expect(screen.getByRole("status")).toHaveTextContent("Correct");
   expect(
-    JSON.parse(localStorage.getItem("flowchartfun-progress-v2") ?? "null"),
-  ).toEqual({ easy: [1], hard: [] });
+    JSON.parse(localStorage.getItem("flowchartfun-progress-v3") ?? "null"),
+  ).toEqual({ guided: [1], draw: [] });
 });
 
 it("reports wrong answers", async () => {

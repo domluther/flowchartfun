@@ -120,14 +120,14 @@ function feedback(level: Level, r: Result) {
 
 export function LevelPlayer({
   level,
-  mode = "easy",
+  mode = "guided",
   nextId,
 }: {
   level: Level;
   mode?: Mode;
   nextId?: number;
 }) {
-  const hard = mode === "hard";
+  const draw = mode === "draw";
   const [placements, setPlacements] = useState<Placements>(() =>
     initialPlacements(level),
   );
@@ -171,7 +171,7 @@ export function LevelPlayer({
 
   const handleCheck = () => {
     const slots = check(level, placements);
-    const edgeResult = hard ? checkEdges(level, edges) : null;
+    const edgeResult = draw ? checkEdges(level, edges) : null;
     const solved = slots.solved && (edgeResult?.solved ?? true);
     setResult({ slots, edges: edgeResult, solved });
     setSelectedEdge(null);
@@ -241,7 +241,7 @@ export function LevelPlayer({
   };
 
   const slotClick = (slotId: string) => {
-    if (hard && pending && placements[slotId]) {
+    if (draw && pending && placements[slotId]) {
       const node = level.nodes.find((n) => n.id === slotId);
       if (node && pending.slot !== slotId) {
         connect(pending, {
@@ -253,6 +253,7 @@ export function LevelPlayer({
       }
       return;
     }
+    if (level.nodes.find((n) => n.id === slotId)?.fixed) return;
     if (selected) {
       update(place(level, placements, slotId, selected));
       setSelected(null);
@@ -264,6 +265,7 @@ export function LevelPlayer({
   const onDrop = (e: React.DragEvent, slotId: string) => {
     e.preventDefault();
     const id = e.dataTransfer.getData("text/plain");
+    if (level.nodes.find((n) => n.id === slotId)?.fixed) return;
     if (id) update(place(level, placements, slotId, id));
     setSelected(null);
   };
@@ -288,7 +290,7 @@ export function LevelPlayer({
     return id ? itemById(level, id).text : "empty slot";
   };
 
-  const arrows: ArrowView[] = hard
+  const arrows: ArrowView[] = draw
     ? edges.map((e) => ({
         id: e.id,
         edge: e,
@@ -314,13 +316,13 @@ export function LevelPlayer({
     return node ? { from: anchor(node, dragFrom.side), to: cursor } : null;
   })();
 
-  const editing = hard ? edges.find((e) => e.id === selectedEdge) : undefined;
+  const editing = draw ? edges.find((e) => e.id === selectedEdge) : undefined;
   const editingMid = editing
     ? pathMidpoint(routeEdge(editing, level.nodes))
     : null;
 
   const filled = level.nodes.filter((n) => placements[n.id]).length;
-  const otherMode: Mode = hard ? "easy" : "hard";
+  const otherMode: Mode = draw ? "guided" : "draw";
   const levelPath = `/level/${level.id}`;
 
   return (
@@ -332,13 +334,16 @@ export function LevelPlayer({
               Level {level.id}: {level.title}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
+              <span className="mr-2 rounded-full bg-blue-100 px-2 py-0.5 font-semibold text-blue-800 capitalize">
+                {level.tier}
+              </span>
               <span
-                className={`mr-2 rounded-full px-2 py-0.5 font-semibold ${hard ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}
+                className={`mr-2 rounded-full px-2 py-0.5 font-semibold ${draw ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"}`}
               >
-                {hard ? "Hard mode" : "Easy mode"}
+                {draw ? "Draw arrows" : "Guided"}
               </span>
               <Link className="underline" to={withMode(levelPath, otherMode)}>
-                Switch to {otherMode}
+                Switch to {otherMode === "draw" ? "draw arrows" : "guided"}
               </Link>
             </p>
           </div>
@@ -370,11 +375,11 @@ export function LevelPlayer({
           {level.instructions}
         </p>
 
-        {hard && (
+        {draw && (
           <p className="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-            <strong>Hard mode:</strong> place the symbols, then draw every arrow
-            yourself. Drag from a dot on one symbol onto another symbol (or
-            click a dot, then click the symbol it should point to). Arrows
+            <strong>Draw arrows:</strong> place the symbols, then draw every
+            arrow yourself. Drag from a dot on one symbol onto another symbol
+            (or click a dot, then click the symbol it should point to). Arrows
             leaving a diamond must be labelled Yes or No. Click an arrow to
             relabel or delete it.
             {pending && (
@@ -425,9 +430,9 @@ export function LevelPlayer({
                 nodes={level.nodes}
                 arrows={arrows}
                 selectedId={selectedEdge}
-                onSelect={hard ? setSelectedEdge : undefined}
+                onSelect={draw ? setSelectedEdge : undefined}
                 onDelete={
-                  hard
+                  draw
                     ? (id) => {
                         setEdges((es) => removeEdge(es, id));
                         setSelectedEdge(null);
@@ -464,14 +469,14 @@ export function LevelPlayer({
                           ? `Slot ${i + 1}: ${item.text}`
                           : `Empty slot ${i + 1}`
                       }
-                      disabled={n.fixed}
+                      aria-disabled={n.fixed || undefined}
                       onClick={() => slotClick(n.id)}
                       {...(item && !n.fixed ? dragProps(item) : {})}
                       className={`h-full w-full ${item ? "" : "rounded-lg border-2 border-dashed border-gray-400 bg-white/60 text-sm text-gray-400 hover:border-blue-400"} ${selected && !n.fixed ? "ring-2 ring-blue-400" : ""}`}
                     >
                       {item ? <Block item={item} /> : i + 1}
                     </button>
-                    {hard &&
+                    {draw &&
                       item &&
                       SIDES.map((side) => {
                         const active =
@@ -521,6 +526,7 @@ export function LevelPlayer({
                         aria-pressed={editing.label === label}
                         onClick={() => {
                           setEdges((es) => setLabel(es, editing.id, label));
+                          setSelectedEdge(null);
                           setResult(null);
                         }}
                         className={`rounded px-2 py-1 font-bold ${editing.label === label ? "bg-blue-600 text-white" : "bg-gray-100 hover:bg-gray-200"}`}
@@ -561,7 +567,7 @@ export function LevelPlayer({
             <p className="mb-3 text-xs text-gray-600">
               Drag a symbol onto the chart, or click it and then click a slot.{" "}
               {filled}/{level.nodes.length} placed.
-              {hard && ` ${edges.length}/${level.edges.length} arrows drawn.`}
+              {draw && ` ${edges.length}/${level.edges.length} arrows drawn.`}
             </p>
             <div className="flex flex-col items-center gap-3">
               {bank.map((item) => (

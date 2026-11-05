@@ -82,10 +82,9 @@ export function routeEdge(edge: EdgeDef, nodes: NodeDef[]): Point[] {
     }
   } else if (!av && !bv) {
     if (p1.y !== p2.y) {
+      const outside = edge.fromSide === "l" ? Math.min : Math.max;
       const x =
-        edge.fromSide === edge.toSide
-          ? Math.min(p1.x, p2.x)
-          : (p1.x + p2.x) / 2;
+        edge.fromSide === edge.toSide ? outside(p1.x, p2.x) : (p1.x + p2.x) / 2;
       pts.push({ x, y: p1.y }, { x, y: p2.y });
     }
   } else if (av) {

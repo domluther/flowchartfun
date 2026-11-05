@@ -25,8 +25,11 @@ export interface EdgeDef {
   label?: string;
 }
 
+export type Tier = "easy" | "medium" | "hard";
+
 export interface Level {
   id: number;
+  tier: Tier;
   title: string;
   topic: string;
   instructions: string;
@@ -38,4 +41,4 @@ export interface Level {
 /** slot id -> placed item id */
 export type Placements = Record<string, string | null>;
 
-export type Mode = "easy" | "hard";
+export type Mode = "guided" | "draw";

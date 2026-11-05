@@ -20,7 +20,7 @@ jest.mock("react-router", () => ({
   ),
 }));
 
-const level = getLevel(3) as Level;
+const level = getLevel(5) as Level;
 type User = ReturnType<typeof userEvent.setup>;
 
 async function placeAll(user: User) {
@@ -52,7 +52,7 @@ async function drawAll(user: User, labels = true) {
 }
 
 function setup() {
-  render(<LevelPlayer level={level} mode="hard" nextId={4} />);
+  render(<LevelPlayer level={level} mode="draw" nextId={6} />);
 }
 
 const check = (user: User) =>
@@ -60,23 +60,23 @@ const check = (user: User) =>
 
 beforeEach(() => localStorage.clear());
 
-it("shows no arrows and no connection points in easy mode", () => {
-  render(<LevelPlayer level={level} mode="easy" />);
+it("shows no arrows and no connection points in guided mode", () => {
+  render(<LevelPlayer level={level} mode="guided" />);
   expect(screen.queryByTestId("handle-start-b")).toBeNull();
   expect(document.querySelectorAll("polyline").length).toBeGreaterThan(0);
 });
 
-it("starts hard mode with no arrows and offers connection points only on placed symbols", async () => {
+it("starts draw mode with no arrows and offers connection points only on placed symbols", async () => {
   const user = userEvent.setup();
   setup();
   expect(document.querySelectorAll("polyline")).toHaveLength(0);
-  expect(screen.queryByTestId("handle-in-b")).toBeNull();
-  await user.click(screen.getByTestId("item-in"));
-  await user.click(screen.getByTestId("slot-in"));
-  expect(screen.getByTestId("handle-in-b")).toBeInTheDocument();
+  expect(screen.queryByTestId("handle-in0-b")).toBeNull();
+  await user.click(screen.getByTestId("item-in0"));
+  await user.click(screen.getByTestId("slot-in0"));
+  expect(screen.getByTestId("handle-in0-b")).toBeInTheDocument();
 });
 
-it("solves a hard level by drawing arrows and labelling the diamond's exits", async () => {
+it("solves a draw-mode level by drawing arrows and labelling the diamond's exits", async () => {
   const user = userEvent.setup();
   setup();
   await placeAll(user);
@@ -84,14 +84,14 @@ it("solves a hard level by drawing arrows and labelling the diamond's exits", as
   await check(user);
   expect(screen.getByRole("status")).toHaveTextContent("Correct");
   expect(
-    JSON.parse(localStorage.getItem("flowchartfun-progress-v2") ?? "{}"),
+    JSON.parse(localStorage.getItem("flowchartfun-progress-v3") ?? "{}"),
   ).toEqual({
-    easy: [],
-    hard: [3],
+    guided: [],
+    draw: [5],
   });
   expect(screen.getByRole("link", { name: /Next level/ })).toHaveAttribute(
     "href",
-    "/level/4?mode=hard",
+    "/level/6?mode=draw",
   );
 });
 
@@ -99,9 +99,9 @@ it("opens the Yes/No chooser for a decision arrow but not for other arrows", asy
   const user = userEvent.setup();
   setup();
   await placeAll(user);
-  await connect(user, "start", "b", "in", "t");
+  await connect(user, "start", "b", "in0", "t");
   expect(screen.queryByRole("button", { name: "Yes" })).toBeNull();
-  await connect(user, "dec", "l", "adult", "t");
+  await connect(user, "dec", "l", "yes", "t");
   const options = screen.getByLabelText("Arrow options");
   expect(
     within(options).getByRole("button", { name: "Yes" }),
@@ -153,9 +153,9 @@ it("removes arrows when their symbol is taken off the chart", async () => {
   const user = userEvent.setup();
   setup();
   await placeAll(user);
-  await connect(user, "start", "b", "in", "t");
+  await connect(user, "start", "b", "in0", "t");
   expect(document.querySelectorAll("polyline").length).toBeGreaterThan(0);
-  await user.click(screen.getByTestId("slot-in"));
+  await user.click(screen.getByTestId("slot-in0"));
   expect(document.querySelectorAll("polyline")).toHaveLength(0);
 });
 
@@ -163,7 +163,7 @@ it("clears arrows on reset", async () => {
   const user = userEvent.setup();
   setup();
   await placeAll(user);
-  await connect(user, "start", "b", "in", "t");
+  await connect(user, "start", "b", "in0", "t");
   await user.click(screen.getByRole("button", { name: "Reset" }));
   expect(document.querySelectorAll("polyline")).toHaveLength(0);
 });

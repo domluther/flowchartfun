@@ -77,7 +77,7 @@ export function check(level: Level, placements: Placements): CheckResult {
   };
 }
 
-const KEY = "flowchartfun-progress-v2";
+const KEY = "flowchartfun-progress-v3";
 
 type Progress = Record<Mode, number[]>;
 
@@ -85,11 +85,11 @@ function readProgress(): Progress {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) ?? "{}");
     return {
-      easy: Array.isArray(parsed.easy) ? parsed.easy : [],
-      hard: Array.isArray(parsed.hard) ? parsed.hard : [],
+      guided: Array.isArray(parsed.guided) ? parsed.guided : [],
+      draw: Array.isArray(parsed.draw) ? parsed.draw : [],
     };
   } catch {
-    return { easy: [], hard: [] };
+    return { guided: [], draw: [] };
   }
 }
 

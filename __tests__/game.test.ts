@@ -6,8 +6,8 @@ import {
   remove,
 } from "../app/lib/game";
 import { routeEdge } from "../app/lib/layout";
-import { levels } from "../app/lib/levels";
-import type { Placements } from "../app/lib/types";
+import { getLevel, levels } from "../app/lib/levels";
+import type { Level, Placements } from "../app/lib/types";
 
 describe.each(levels)("level $id: $title", (level) => {
   const solution = (): Placements =>
@@ -70,7 +70,7 @@ describe("placement", () => {
   });
 
   it("cannot change fixed slots", () => {
-    const l = levels[4];
+    const l = getLevel(11) as Level;
     const p = initialPlacements(l);
     expect(remove(l, p, "start")).toBe(p);
     expect(place(l, p, "start", "in")).toBe(p);

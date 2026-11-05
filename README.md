@@ -1,87 +1,35 @@
-# Welcome to React Router!
+# FlowchartFun
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Flowchart practice for OCR GCSE Computer Science (J277). Built with React Router, pnpm, Jest, Playwright and Biome.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+## Levels
 
-## Features
+30 levels in three tiers of 10:
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- **Easy**: sequence and a single decision
+- **Medium**: nested decisions and simple loops
+- **Hard**: loops with decisions inside, validation and several exits
 
-## Getting Started
+Every level can be played in two modes (`?mode=draw` in the URL for the second):
 
-### Installation
+- **Guided**: the arrows are already drawn. Drag (or click) symbols into the numbered slots.
+- **Draw arrows**: place the symbols, then drag from a connection point onto another symbol to draw each arrow. Arrows leaving a diamond must be labelled Yes or No.
 
-Install the dependencies:
+Progress is saved in the browser, separately for each mode.
 
-```bash
-npm install
-```
+## Scripts
 
-### Development
+| Command          | What it does                                  |
+| ---------------- | --------------------------------------------- |
+| `pnpm dev`       | Start the dev server on http://localhost:5173 |
+| `pnpm test`      | Jest unit and component tests                 |
+| `pnpm test:e2e`  | Playwright tests: every level in both modes   |
+| `pnpm lint`      | Biome (`pnpm lint:fix` to auto-fix)           |
+| `pnpm typecheck` | Generate route types and run `tsc`            |
+| `pnpm build`     | Production build                              |
 
-Start the development server with HMR:
+The first time you run the Playwright tests, install a browser with `pnpm exec playwright install chromium`.
 
-```bash
-npm run dev
-```
+## Adding a level
 
-Your application will be available at `http://localhost:5173`.
-
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-## Deployment
-
-### Docker Deployment
-
-To build and run using Docker:
-
-```bash
-docker build -t my-app .
-
-# Run the container
-docker run -p 3000:3000 my-app
-```
-
-The containerized application can be deployed to any platform that supports Docker, including:
-
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+Levels live in `app/lib/levels.ts`. Each symbol has a grid column (0 to 2) and row, and each arrow names the sides it leaves and enters. `__tests__/levels.test.ts` checks every level for a start and end, Yes/No on every decision, reachability, and arrows that pass through symbols or overlap.
