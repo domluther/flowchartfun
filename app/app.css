@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  @apply bg-blue-50 text-gray-900;
+}

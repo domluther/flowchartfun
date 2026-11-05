@@ -1,0 +1,109 @@
+import type { Item, Level, Mode, Placements } from "./types";
+
+export function initialPlacements(level: Level): Placements {
+  const p: Placements = {};
+  for (const n of level.nodes) p[n.id] = n.fixed ? n.answer : null;
+  return p;
+}
+
+export function itemById(level: Level, id: string): Item {
+  const item = level.items.find((i) => i.id === id);
+  if (!item) throw new Error(`Unknown item ${id}`);
+  return item;
+}
+
+/** Items that are not currently sitting in a slot. */
+export function bankItems(level: Level, placements: Placements): Item[] {
+  const used = new Set(Object.values(placements));
+  return level.items.filter((i) => !used.has(i.id));
+}
+
+/** Put an item in a slot. Moving from another slot swaps the two. */
+export function place(
+  level: Level,
+  placements: Placements,
+  slotId: string,
+  itemId: string,
+): Placements {
+  const isFixed = (id: string) => level.nodes.find((n) => n.id === id)?.fixed;
+  if (isFixed(slotId)) return placements;
+
+  const source = Object.keys(placements).find((k) => placements[k] === itemId);
+  if (source && isFixed(source)) return placements;
+
+  const next = { ...placements };
+  const occupant = placements[slotId] ?? null;
+  if (source) next[source] = occupant;
+  next[slotId] = itemId;
+  return next;
+}
+
+export function remove(
+  level: Level,
+  placements: Placements,
+  slotId: string,
+): Placements {
+  if (level.nodes.find((n) => n.id === slotId)?.fixed) return placements;
+  return { ...placements, [slotId]: null };
+}
+
+export interface CheckResult {
+  correct: string[];
+  wrong: string[];
+  empty: string[];
+  solved: boolean;
+}
+
+/** Items with identical shape and text are interchangeable. */
+export function check(level: Level, placements: Placements): CheckResult {
+  const correct: string[] = [];
+  const wrong: string[] = [];
+  const empty: string[] = [];
+  for (const n of level.nodes) {
+    const placed = placements[n.id];
+    if (!placed) {
+      empty.push(n.id);
+      continue;
+    }
+    const a = itemById(level, placed);
+    const b = itemById(level, n.answer);
+    (a.shape === b.shape && a.text === b.text ? correct : wrong).push(n.id);
+  }
+  return {
+    correct,
+    wrong,
+    empty,
+    solved: correct.length === level.nodes.length,
+  };
+}
+
+const KEY = "flowchartfun-progress-v2";
+
+type Progress = Record<Mode, number[]>;
+
+function readProgress(): Progress {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(KEY) ?? "{}");
+    return {
+      easy: Array.isArray(parsed.easy) ? parsed.easy : [],
+      hard: Array.isArray(parsed.hard) ? parsed.hard : [],
+    };
+  } catch {
+    return { easy: [], hard: [] };
+  }
+}
+
+export function loadCompleted(mode: Mode): number[] {
+  return readProgress()[mode];
+}
+
+export function saveCompleted(levelId: number, mode: Mode): number[] {
+  const progress = readProgress();
+  progress[mode] = Array.from(new Set([...progress[mode], levelId]));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(progress));
+  } catch {
+    /* storage unavailable */
+  }
+  return progress[mode];
+}
