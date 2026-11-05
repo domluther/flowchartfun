@@ -56,6 +56,7 @@ app/
   routes/level.tsx       loads a level by id, handles unknown ids
   components/
     LevelPlayer.tsx      the game screen for all modes
+    CodePanel.tsx        collapsible Python / OCR ERL code, with ERL IDE link
     ArrowLayer.tsx       SVG arrows, drag preview, Yes/No labels
   lib/
     types.ts             Level, NodeDef, EdgeDef, Item, Tier, Mode, Side, Shape
@@ -63,6 +64,7 @@ app/
     game.ts              placements, check(), progress storage
     edges.ts             draw-mode arrow logic and checkEdges()
     layout.ts            grid to pixel positions, routeEdge, nearestSide, labels
+    code.ts              generateCode() flowchart -> Python/ERL, generateERLURL()
     mode.ts              parseMode / withMode for the ?mode= param
 __tests__/               Jest suites
 e2e/levels.spec.ts       Playwright suite
@@ -149,5 +151,4 @@ It solves every level in all modes, checks that swapped symbols are rejected, te
 - Hints, a "show solution" button, or a count of checks used.
 - Teacher view or class progress. Progress is local to the browser only. (Printable PDF workbooks already exist: `pnpm worksheets`, see the README.)
 - Pseudocode-to-flowchart or flowchart-to-pseudocode tasks.
-- Touch support for arrow drawing, and keyboard accessibility for drag actions.
 - Allowing more interchangeable orderings, such as the output order inside loops.

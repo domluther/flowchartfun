@@ -452,3 +452,34 @@ test("an unknown level shows a helpful message", async ({ page }) => {
   await page.goto("/level/999");
   await expect(page.getByText("That level doesn't exist.")).toBeVisible();
 });
+
+test("the code panel shows Python and links ERL to the IDE", async ({
+  page,
+}) => {
+  await page.goto("/level/12");
+  await page.waitForLoadState("networkidle");
+  await page.getByText("Show the code for this flowchart").click();
+  await expect(page.getByTestId("code-output")).toContainText(
+    "while count <= 5:",
+  );
+  await expect(page.getByTestId("open-erl-ide")).toHaveCount(0);
+  await page.getByTestId("code-tab-erl").click();
+  await expect(page.getByTestId("code-output")).toContainText("endwhile");
+  await expect(page.getByTestId("open-erl-ide")).toHaveAttribute(
+    "href",
+    /^https:\/\/www\.examreferencelanguage\.co\.uk\/index\.php\?code=/,
+  );
+  await expect(page.getByTestId("open-erl-ide")).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+});
+
+test("n and p keys move between puzzles", async ({ page }) => {
+  await page.goto("/level/5");
+  await page.waitForLoadState("networkidle");
+  await page.keyboard.press("n");
+  await expect(page).toHaveURL(/\/level\/6/);
+  await page.keyboard.press("p");
+  await expect(page).toHaveURL(/\/level\/5/);
+});

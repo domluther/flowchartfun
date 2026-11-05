@@ -48,6 +48,7 @@ import type {
 } from "../lib/types";
 import { ArrowLayer, type ArrowView } from "./ArrowLayer";
 import { Block } from "./Block";
+import { CodePanel } from "./CodePanel";
 
 interface Endpoint {
   slot: string;
@@ -510,6 +511,21 @@ export function LevelPlayer({
     drawShapes && level.nodes.some((node) => isDecisionNode(level, node.id));
   const levelPath = `/level/${level.id}`;
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      const dir = e.key === "n" ? "next" : e.key === "p" ? "previous" : null;
+      if (!dir) return;
+      document
+        .querySelector<HTMLAnchorElement>(`a[data-nav="${dir}"]`)
+        ?.click();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="mx-auto max-w-7xl p-4 sm:p-6">
       <div className="rounded-2xl bg-white p-4 shadow-lg sm:p-6">
@@ -572,6 +588,8 @@ export function LevelPlayer({
         >
           {previousId ? (
             <Link
+              data-nav="previous"
+              title="Shortcut: P"
               to={withMode(`/level/${previousId}`, mode)}
               className="rounded-lg bg-blue-100 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-200"
             >
@@ -588,6 +606,8 @@ export function LevelPlayer({
           )}
           {nextId ? (
             <Link
+              data-nav="next"
+              title="Shortcut: N"
               to={withMode(`/level/${nextId}`, mode)}
               className="rounded-lg bg-blue-100 px-4 py-2 font-semibold text-blue-800 hover:bg-blue-200"
             >
@@ -896,6 +916,8 @@ export function LevelPlayer({
             </div>
           </aside>
         </div>
+
+        <CodePanel level={level} />
       </div>
     </div>
   );
