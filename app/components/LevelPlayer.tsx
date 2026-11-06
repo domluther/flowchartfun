@@ -216,7 +216,10 @@ export function LevelPlayer({
   const bank = useMemo(
     () =>
       bankItems(level, placements).sort(
-        (a, b) => hash(level.id + a.id) - hash(level.id + b.id),
+        (a, b) =>
+          SHAPE_TOOLS.findIndex((tool) => tool.shape === a.shape) -
+            SHAPE_TOOLS.findIndex((tool) => tool.shape === b.shape) ||
+          hash(level.id + a.id) - hash(level.id + b.id),
       ),
     [level, placements],
   );
@@ -845,7 +848,7 @@ export function LevelPlayer({
           </div>
 
           <aside
-            className="rounded-xl bg-gray-200 p-4 lg:w-60 lg:shrink-0"
+            className="rounded-xl bg-gray-200 p-4 lg:order-first lg:w-60 lg:shrink-0"
             onDragOver={(e) => e.preventDefault()}
             onDrop={onBankDrop}
           >

@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Block } from "../app/components/Block";
 import { LevelPlayer } from "../app/components/LevelPlayer";
 import { levels } from "../app/lib/levels";
 
@@ -20,6 +21,45 @@ jest.mock("react-router", () => ({
 }));
 
 const level = levels[0];
+
+it.each(["Start", "End"])("renders the %s terminator in green", (text) => {
+  render(
+    <Block item={{ id: text.toLowerCase(), shape: "terminator", text }} />,
+  );
+
+  expect(screen.getByText(text)).toHaveClass("bg-green-500");
+});
+
+it.each(["guided", "draw"] as const)(
+  "groups toolbox symbols by shape in %s mode",
+  (mode) => {
+    const levelWithEachShape = levels.find((candidate) =>
+      ["terminator", "io", "process", "decision"].every((shape) =>
+        candidate.items.some((item) => item.shape === shape),
+      ),
+    );
+    if (!levelWithEachShape) throw new Error("No level contains every shape");
+
+    render(<LevelPlayer level={levelWithEachShape} mode={mode} />);
+
+    const shapeOrder = ["terminator", "io", "process", "decision"];
+    const displayedShapes = screen.getAllByTestId(/^item-/).map((button) => {
+      const itemId = button.getAttribute("data-testid")?.slice("item-".length);
+      const item = levelWithEachShape.items.find(
+        (candidate) => candidate.id === itemId,
+      );
+      if (!item) throw new Error(`Missing item for ${itemId}`);
+      return item.shape;
+    });
+
+    expect(displayedShapes).toEqual(
+      [...displayedShapes].sort(
+        (a, b) => shapeOrder.indexOf(a) - shapeOrder.indexOf(b),
+      ),
+    );
+    expect(new Set(displayedShapes)).toEqual(new Set(shapeOrder));
+  },
+);
 
 function setup() {
   render(<LevelPlayer level={level} nextId={2} />);

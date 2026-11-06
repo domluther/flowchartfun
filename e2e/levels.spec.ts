@@ -92,9 +92,18 @@ async function dragArrow(
   await page.mouse.up();
 }
 
-async function drawArrows(page: Page, level: Level) {
+async function drawArrows(
+  page: Page,
+  level: Level,
+  slotForSymbol?: Map<string, string>,
+) {
   for (const edge of level.edges) {
-    await dragArrow(page, edge.from, edge.fromSide, edge.to);
+    await dragArrow(
+      page,
+      slotForSymbol?.get(edge.from) ?? edge.from,
+      edge.fromSide,
+      slotForSymbol?.get(edge.to) ?? edge.to,
+    );
     if (edge.label) {
       const options = page.getByLabel("Arrow options");
       await expect(options).toBeVisible();
@@ -235,7 +244,15 @@ for (const mode of modes) {
             .click();
           await page.getByTestId(`slot-${node.id}`).click();
         }
-        if (mode === "draw") await drawArrows(page, level);
+        if (mode === "draw") {
+          const slotForSymbol = new Map(
+            level.nodes.map((node) => [
+              answers[node.id] ?? node.answer,
+              node.id,
+            ]),
+          );
+          await drawArrows(page, level, slotForSymbol);
+        }
         await page.getByRole("button", { name: "Check Answer" }).click();
         await expect(status(page)).toContainText("Correct");
       });

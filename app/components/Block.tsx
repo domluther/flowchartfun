@@ -10,9 +10,7 @@ const clip: Record<Item["shape"], string | undefined> = {
 function colour(item: Item) {
   switch (item.shape) {
     case "terminator":
-      return item.text.toLowerCase() === "start"
-        ? "bg-green-500"
-        : "bg-red-500";
+      return "bg-green-500";
     case "io":
       return "bg-purple-500";
     case "process":
